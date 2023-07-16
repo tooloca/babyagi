@@ -19,8 +19,6 @@ import time
 
 # Add your API keys here
 OPENAI_API_KEY = ""
-SERPAPI_API_KEY = "" #[optional] web-search becomes available automatically when serpapi api key is provided
-
 # Set variables
 OBJECTIVE = "Research recent AI news and write a poem about your findings in the style of shakespeare."
 
@@ -31,30 +29,22 @@ user_input=False
 
 # Configure OpenAI and SerpAPI client
 openai.api_key = OPENAI_API_KEY
-if SERPAPI_API_KEY:
+if SERPAPI_API_KEY := "":
   serpapi_client = GoogleSearch({"api_key": SERPAPI_API_KEY})
   websearch_var = "[web-search] "
 else:
   websearch_var = ""
 
-if user_input == True:
-  user_input_var = "[user-input]"
-else:
-  user_input_var = ""
-
-
+user_input_var = "[user-input]" if user_input else ""
 # Initialize task list
 task_list = []
 
 # Initialize session_summary
-session_summary = "OBJECTIVE: "+OBJECTIVE+"\n\n"
+session_summary = f"OBJECTIVE: {OBJECTIVE}" + "\n\n"
 
 ### Task list functions ##############################
 def get_task_by_id(task_id: int):
-    for task in task_list:
-        if task["id"] == task_id:
-            return task
-    return None
+  return next((task for task in task_list if task["id"] == task_id), None)
 
 # Print task list and session summary
 def print_tasklist():
@@ -92,39 +82,41 @@ def user_input_tool(prompt: str):
 
 def web_search_tool(query: str , dependent_tasks_output : str):
     
-    if dependent_tasks_output != "":
-      dependent_task = f"Use the dependent task output below as reference to help craft the correct search query for the provided task above. Dependent task output:{dependent_tasks_output}."
-    else:
-      dependent_task = "."
-    query = text_completion_tool("You are an AI assistant tasked with generating a Google search query based on the following task: "+query+". If the task looks like a search query, return the identical search query as your response. " + dependent_task + "\nSearch Query:")
-    print("\033[90m\033[3m"+"Search query: " +str(query)+"\033[0m")
-    search_params = {
-        "engine": "google",
-        "q": query,
-        "api_key": SERPAPI_API_KEY,
-        "num":3 #edit this up or down for more results, though higher often results in OpenAI rate limits
-    }
-    search_results = GoogleSearch(search_params)
-    search_results = search_results.get_dict()
-    try:
-      search_results = search_results["organic_results"]
-    except:
-      search_results = {}
-    search_results = simplify_search_results(search_results)
-    print("\033[90m\033[3m" + "Completed search. Now scraping results.\n" + "\033[0m")
-    results = "";
+  if dependent_tasks_output != "":
+    dependent_task = f"Use the dependent task output below as reference to help craft the correct search query for the provided task above. Dependent task output:{dependent_tasks_output}."
+  else:
+    dependent_task = "."
+  query = text_completion_tool(
+      f"You are an AI assistant tasked with generating a Google search query based on the following task: {query}. If the task looks like a search query, return the identical search query as your response. {dependent_task}"
+      + "\nSearch Query:")
+  print("\033[90m\033[3m"+"Search query: " +str(query)+"\033[0m")
+  search_params = {
+      "engine": "google",
+      "q": query,
+      "api_key": SERPAPI_API_KEY,
+      "num":3 #edit this up or down for more results, though higher often results in OpenAI rate limits
+  }
+  search_results = GoogleSearch(search_params)
+  search_results = search_results.get_dict()
+  try:
+    search_results = search_results["organic_results"]
+  except:
+    search_results = {}
+  search_results = simplify_search_results(search_results)
+  print("\033[90m\033[3m" + "Completed search. Now scraping results.\n" + "\033[0m")
+  results = "";
     # Loop through the search results
-    for result in search_results:
-        # Extract the URL from the result
-        url = result.get('link')
-        # Call the web_scrape_tool function with the URL
-        print("\033[90m\033[3m" + "Scraping: "+url+"" + "...\033[0m")
-        content = web_scrape_tool(url, task)
-        print("\033[90m\033[3m" +str(content[0:100])[0:100]+"...\n" + "\033[0m")
-        results += str(content)+". "
-    
-    results = text_completion_tool(f"You are an expert analyst. Rewrite the following information as one report without removing any facts.\n###INFORMATION:{results}.\n###REPORT:")
-    return results
+  for result in search_results:
+    # Extract the URL from the result
+    url = result.get('link')
+    # Call the web_scrape_tool function with the URL
+    print("\033[90m\033[3m" + "Scraping: "+url+"" + "...\033[0m")
+    content = web_scrape_tool(url, task)
+    print("\033[90m\033[3m" + str(content[:100])[:100] + "...\n" + "\033[0m")
+    results += f"{str(content)}. "
+
+  results = text_completion_tool(f"You are an expert analyst. Rewrite the following information as one report without removing any facts.\n###INFORMATION:{results}.\n###REPORT:")
+  return results
 
 
 def simplify_search_results(search_results):
@@ -141,19 +133,16 @@ def simplify_search_results(search_results):
 
 
 def web_scrape_tool(url: str, task:str):
-    content = fetch_url_content(url)
-    if content is None:
-        return None
+  content = fetch_url_content(url)
+  if content is None:
+      return None
 
-    text = extract_text(content)
-    print("\033[90m\033[3m"+"Scrape completed. Length:" +str(len(text))+".Now extracting relevant info..."+"...\033[0m")
-    info = extract_relevant_info(OBJECTIVE, text[0:5000], task)
-    links = extract_links(content)
+  text = extract_text(content)
+  print("\033[90m\033[3m"+"Scrape completed. Length:" +str(len(text))+".Now extracting relevant info..."+"...\033[0m")
+  info = extract_relevant_info(OBJECTIVE, text[:5000], task)
+  links = extract_links(content)
 
-    #result = f"{info} URLs: {', '.join(links)}"
-    result = info
-    
-    return result
+  return info
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36"
@@ -169,102 +158,113 @@ def fetch_url_content(url: str):
         return ""
 
 def extract_links(content: str):
-    soup = BeautifulSoup(content, "html.parser")
-    links = [link.get('href') for link in soup.findAll('a', attrs={'href': re.compile("^https?://")})]
-    return links
+  soup = BeautifulSoup(content, "html.parser")
+  return [
+      link.get('href')
+      for link in soup.findAll('a', attrs={'href': re.compile("^https?://")})
+  ]
 
 def extract_text(content: str):
-    soup = BeautifulSoup(content, "html.parser")
-    text = soup.get_text(strip=True)
-    return text
+  soup = BeautifulSoup(content, "html.parser")
+  return soup.get_text(strip=True)
 
 
 
 def extract_relevant_info(objective, large_string, task):
-    chunk_size = 3000
-    overlap = 500
-    notes = ""
-    
-    for i in range(0, len(large_string), chunk_size - overlap):
-        chunk = large_string[i:i + chunk_size]
-        
-        messages = [
-            {"role": "system", "content": f"You are an AI assistant."},
-            {"role": "user", "content": f"You are an expert AI research assistant tasked with creating or updating the current notes. If the current note is empty, start a current-notes section by exracting relevant data to the task and objective from the chunk of text to analyze. If there is a current note, add new relevant info frol the chunk of text to analyze. Make sure the new or combined notes is comprehensive and well written. Here's the current chunk of text to analyze: {chunk}. ### Here is the current task: {task}.### For context, here is the objective: {OBJECTIVE}.### Here is the data we've extraced so far that you need to update: {notes}.### new-or-updated-note:"}
-        ]
+  chunk_size = 3000
+  overlap = 500
+  notes = ""
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=800,
-            n=1,
-            stop="###",
-            temperature=0.7,
-        )
+  for i in range(0, len(large_string), chunk_size - overlap):
+    chunk = large_string[i:i + chunk_size]
 
-        notes += response.choices[0].message['content'].strip()+". ";
-    
-    return notes
+    messages = [
+        {
+            "role": "system",
+            "content": "You are an AI assistant."
+        },
+        {
+            "role":
+            "user",
+            "content":
+            f"You are an expert AI research assistant tasked with creating or updating the current notes. If the current note is empty, start a current-notes section by exracting relevant data to the task and objective from the chunk of text to analyze. If there is a current note, add new relevant info frol the chunk of text to analyze. Make sure the new or combined notes is comprehensive and well written. Here's the current chunk of text to analyze: {chunk}. ### Here is the current task: {task}.### For context, here is the objective: {OBJECTIVE}.### Here is the data we've extraced so far that you need to update: {notes}.### new-or-updated-note:",
+        },
+    ]
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        max_tokens=800,
+        n=1,
+        stop="###",
+        temperature=0.7,
+    )
+
+    notes += response.choices[0].message['content'].strip()+". ";
+
+  return notes
 
 ### Agent functions ##############################
 
 
 def execute_task(task, task_list, OBJECTIVE):
     
-    global session_summary
-    global task_id_counter
-    # Check if dependent_task_ids is not empty
-    if task["dependent_task_ids"]:
-      all_dependent_tasks_complete = True
-      for dep_id in task["dependent_task_ids"]:
-          dependent_task = get_task_by_id(dep_id)
-          if not dependent_task or dependent_task["status"] != "complete":
-              all_dependent_tasks_complete = False
-              break
-  
-        
-    # Execute task
-    p_nexttask="\033[92m\033[1m"+"\n*****NEXT TASK ID:"+str(task['id'])+"*****\n"+"\033[0m\033[0m"
-    p_nexttask += str(task['id'])+": "+str(task['task'])+" ["+str(task['tool']+"]")
-    print(p_nexttask)
-    task_prompt = f"Complete your assigned task based on the objective and only based on information provided in the dependent task output, if provided. \n###\nYour objective: {OBJECTIVE}. \n###\nYour task: {task['task']}"
-    if task["dependent_task_ids"]:
-      dependent_tasks_output = ""
-      for dep_id in task["dependent_task_ids"]:
-          dependent_task_output = get_task_by_id(dep_id)["output"]
-          dependent_task_output = dependent_task_output[0:2000]
-          dependent_tasks_output += f" {dependent_task_output}"
-      task_prompt += f" \n###\ndependent tasks output: {dependent_tasks_output}  \n###\nYour task: {task['task']}\n###\nRESPONSE:"
-    else:
-      dependent_tasks_output="."
+  global session_summary
+  global task_id_counter
+  # Check if dependent_task_ids is not empty
+  if task["dependent_task_ids"]:
+    all_dependent_tasks_complete = True
+    for dep_id in task["dependent_task_ids"]:
+        dependent_task = get_task_by_id(dep_id)
+        if not dependent_task or dependent_task["status"] != "complete":
+            all_dependent_tasks_complete = False
+            break
 
-    # Use tool to complete the task
-    if task["tool"] == "text-completion":
-        task_output = text_completion_tool(task_prompt)
-    elif task["tool"] == "web-search":
-        task_output = web_search_tool(str(task['task']),str(dependent_tasks_output))
-    elif task["tool"] == "web-scrape":
-        task_output = web_scrape_tool(str(task['task']))
-    elif task["tool"] == "user-input":
-        task_output = user_input_tool(str(task['task']))
 
-    
+  # Execute task
+  p_nexttask="\033[92m\033[1m"+"\n*****NEXT TASK ID:"+str(task['id'])+"*****\n"+"\033[0m\033[0m"
+  p_nexttask += str(task['id'])+": "+str(task['task'])+" ["+str(task['tool']+"]")
+  print(p_nexttask)
+  task_prompt = f"Complete your assigned task based on the objective and only based on information provided in the dependent task output, if provided. \n###\nYour objective: {OBJECTIVE}. \n###\nYour task: {task['task']}"
+  if task["dependent_task_ids"]:
+    dependent_tasks_output = ""
+    for dep_id in task["dependent_task_ids"]:
+      dependent_task_output = get_task_by_id(dep_id)["output"]
+      dependent_task_output = dependent_task_output[:2000]
+      dependent_tasks_output += f" {dependent_task_output}"
+    task_prompt += f" \n###\ndependent tasks output: {dependent_tasks_output}  \n###\nYour task: {task['task']}\n###\nRESPONSE:"
+  else:
+    dependent_tasks_output="."
 
-    # Find task index in the task_list
-    task_index = next((i for i, t in enumerate(task_list) if t["id"] == task["id"]), None)
+  # Use tool to complete the task
+  if task["tool"] == "text-completion":
+      task_output = text_completion_tool(task_prompt)
+  elif task["tool"] == "web-search":
+      task_output = web_search_tool(str(task['task']),str(dependent_tasks_output))
+  elif task["tool"] == "web-scrape":
+      task_output = web_scrape_tool(str(task['task']))
+  elif task["tool"] == "user-input":
+      task_output = user_input_tool(str(task['task']))
 
-    # Mark task as complete and save output
-    task_list[task_index]["status"] = "complete"
-    task_list[task_index]["output"] = task_output
 
-    # Print task output
-    print("\033[93m\033[1m"+"\nTask Output (ID:"+str(task['id'])+"):"+"\033[0m\033[0m")
-    print(task_output)
-    # Add task output to session_summary
-    session_summary += f"\n\nTask {task['id']} - {task['task']}:\n{task_output}"
+
+  # Find task index in the task_list
+  task_index = next((i for i, t in enumerate(task_list) if t["id"] == task["id"]), None)
+
+  # Mark task as complete and save output
+  task_list[task_index]["status"] = "complete"
+  task_list[task_index]["output"] = task_output
+
+  # Print task output
+  print("\033[93m\033[1m"+"\nTask Output (ID:"+str(task['id'])+"):"+"\033[0m\033[0m")
+  print(task_output)
+  # Add task output to session_summary
+  session_summary += f"\n\nTask {task['id']} - {task['task']}:\n{task_output}"
 
 def task_ready_to_run(task, task_list):
-    return all([get_task_by_id(dep_id)["status"] == "complete" for dep_id in task["dependent_task_ids"]])
+  return all(
+      get_task_by_id(dep_id)["status"] == "complete"
+      for dep_id in task["dependent_task_ids"])
 
 
 task_list = []
@@ -347,8 +347,7 @@ with ThreadPoolExecutor() as executor:
 
 # Print session summary
 print("\033[96m\033[1m"+"\n*****SAVING FILE...*****\n"+"\033[0m\033[0m")
-file = open(f'output/output_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.txt', 'w')
-file.write(session_summary)
-file.close()
+with open(f'output/output_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}.txt', 'w') as file:
+  file.write(session_summary)
 print("...file saved.")
 print("END")
