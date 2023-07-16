@@ -14,18 +14,15 @@ class DirectoryStructure(Skill):
 
         # Get the top parent directory of current script
         top_parent_path = self.get_top_parent_path(current_script_path)
-        # Get the directory structure from the top parent directory
-        dir_structure = self.get_directory_structure(top_parent_path)
-
-        return dir_structure
+        return self.get_directory_structure(top_parent_path)
 
     def get_directory_structure(self, start_path):
         dir_structure = {}
         ignore_dirs = ['.','__init__.py', '__pycache__', 'pydevd', 'poetry','venv']  # add any other directories to ignore here
-    
+
         for root, dirs, files in os.walk(start_path):
             dirs[:] = [d for d in dirs if not any(d.startswith(i) for i in ignore_dirs)]  # exclude specified directories
-            files = [f for f in files if not f[0] == '.' and f.endswith('.py')]  # exclude hidden files and non-Python files
+            files = [f for f in files if f[0] != '.' and f.endswith('.py')]
 
             current_dict = dir_structure
             path_parts = os.path.relpath(root, start_path).split(os.sep)

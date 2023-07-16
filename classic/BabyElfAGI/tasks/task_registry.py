@@ -77,7 +77,7 @@ class TaskRegistry:
         task_output = skill.execute(task['task'], dependent_task_outputs, objective)
         print("\033[93m\033[1m"+"\nTask Output (ID:"+str(task['id'])+"):"+"\033[0m\033[0m")
         print("TASK: "+str(task["task"]))
-        print("OUTPUT: "+str(task_output))
+        print(f"OUTPUT: {str(task_output)}")
         return i, task_output
 
   
@@ -162,20 +162,17 @@ class TaskRegistry:
             result = response["choices"][0]["message"]["content"]
             print("\n#" + str(result))
 
-            # Check if the returned result has the expected structure
-            if isinstance(result, str):
-                try:
-                    task_list = json.loads(result)
-                    # print("RESULT:")
-
-                    print(task_list)
-                    # return [],[],[]
-                    return task_list[0], task_list[1], task_list[2]
-                except Exception as error:
-                    print(error)
-
-            else:
+            if not isinstance(result, str):
                 raise ValueError("Invalid task list structure in the output")
+            try:
+                task_list = json.loads(result)
+                # print("RESULT:")
+
+                print(task_list)
+                # return [],[],[]
+                return task_list[0], task_list[1], task_list[2]
+            except Exception as error:
+                print(error)
 
     def get_tasks(self):
         """
@@ -198,13 +195,12 @@ class TaskRegistry:
         dict
             The task that matches the task_id.
         """
-        matching_tasks = [task for task in self.tasks if task["id"] == task_id]
-
-        if matching_tasks:
+        if matching_tasks := [
+            task for task in self.tasks if task["id"] == task_id
+        ]:
             return matching_tasks[0]
-        else:
-            print(f"No task found with id {task_id}")
-            return None
+        print(f"No task found with id {task_id}")
+        return None
 
     def print_tasklist(self, task_list):
         p_tasklist="\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m"
@@ -244,21 +240,20 @@ class ExampleObjectivesLoader:
 
     def get_embedding(self, text, model='text-embedding-ada-002'):
         response = openai.Embedding.create(input=[text], model=model)
-        embedding = response['data'][0]['embedding']
-        return embedding
+        return response['data'][0]['embedding']
 
     def cosine_similarity(self, objective, embedding):
         max_similarity = float('-inf')
         objective_embedding = self.get_embedding(objective, model='text-embedding-ada-002')
         similarity = self.calculate_similarity(objective_embedding, embedding)
-        max_similarity = max(max_similarity, similarity)
-        return max_similarity
+        return max(max_similarity, similarity)
 
     def calculate_similarity(self, embedding1, embedding2):
         embedding1 = np.array(embedding1, dtype=np.float32)
         embedding2 = np.array(embedding2, dtype=np.float32)
-        similarity = np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
-        return similarity
+        return np.dot(embedding1, embedding2) / (
+            np.linalg.norm(embedding1) * np.linalg.norm(embedding2)
+        )
 
     def load_example_objectives(self, user_objective):
         self.load_objectives_examples()

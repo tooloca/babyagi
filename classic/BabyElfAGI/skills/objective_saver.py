@@ -16,7 +16,7 @@ class ObjectiveSaver(Skill):
         #print(dependent_task_outputs[2])
         code =  dependent_task_outputs[2]
         task_prompt = f"Come up with a file name (eg. 'research_shoes.json') for the following objective:{code}\n###\nFILE_NAME:"
-      
+
         messages = [
             {"role": "user", "content": task_prompt}
         ]
@@ -29,13 +29,13 @@ class ObjectiveSaver(Skill):
             frequency_penalty=0,
             presence_penalty=0
         ) 
-    
+
         file_name =  response.choices[0].message['content'].strip()
         file_path = os.path.join('tasks/example_objectives',file_name)
 
         try:
             with open(file_path, 'w') as file:
-                file.write("["+code+"]")
+                file.write(f"[{code}]")
                 print(f"Code saved successfully: {file_name}")
         except:
             print("Error saving code.")

@@ -109,7 +109,9 @@ if LLM_MODEL.startswith("llama"):
         from llama_cpp import Llama
 
         print(f"LLAMA : {LLAMA_MODEL_PATH}" + "\n")
-        assert os.path.exists(LLAMA_MODEL_PATH), "\033[91m\033[1m" + f"Model can't be found." + "\033[0m\033[0m"
+        assert os.path.exists(LLAMA_MODEL_PATH), (
+            "\033[91m\033[1m" + "Model can't be found." + "\033[0m\033[0m"
+        )
 
         CTX_MAX = 1024
         LLAMA_THREADS_NUM = int(os.getenv("LLAMA_THREADS_NUM", 8))
@@ -292,7 +294,7 @@ class SingleTaskListStorage:
         return self.tasks.popleft()
 
     def is_empty(self):
-        return False if self.tasks else True
+        return not self.tasks
 
     def next_task_id(self):
         self.task_id_counter += 1
@@ -304,8 +306,8 @@ class SingleTaskListStorage:
 
 # Initialize tasks storage
 tasks_storage = SingleTaskListStorage()
-if COOPERATIVE_MODE in ['l', 'local']:
-    if can_import("extensions.ray_tasks"):
+if can_import("extensions.ray_tasks"):
+    if COOPERATIVE_MODE in ['l', 'local']:
         import sys
         from pathlib import Path
 
@@ -314,8 +316,6 @@ if COOPERATIVE_MODE in ['l', 'local']:
 
         tasks_storage = CooperativeTaskListStorage(OBJECTIVE)
         print("\nReplacing tasks storage: " + "\033[93m\033[1m" + "Ray" + "\033[0m\033[0m")
-elif COOPERATIVE_MODE in ['d', 'distributed']:
-    pass
 
 
 def limit_tokens_from_string(string: str, model: str, limit: int) -> str:
@@ -454,8 +454,7 @@ Unless your list is empty, do not include any headers before your numbered list 
                 new_tasks_list.append(task_name)
             # print('New task created: ' + task_name)
 
-    out = [{"task_name": task_name} for task_name in new_tasks_list]
-    return out
+    return [{"task_name": task_name} for task_name in new_tasks_list]
 
 
 def prioritization_agent():
@@ -531,10 +530,7 @@ def context_agent(query: str, top_results_num: int):
         list: A list of tasks as context for the given query, sorted by relevance.
 
     """
-    results = results_storage.query(query=query, top_results_num=top_results_num)
-    # print("****RESULTS****")
-    # print(results)
-    return results
+    return results_storage.query(query=query, top_results_num=top_results_num)
 
 
 # Add the initial task if starting new objective
@@ -554,12 +550,12 @@ def main():
             # Print the task list
             print("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
             for t in tasks_storage.get_task_names():
-                print(" • " + str(t))
+                print(f" • {str(t)}")
 
             # Step 1: Pull the first incomplete task
             task = tasks_storage.popleft()
             print("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
-            print(str(task["task_name"]))
+            print(task["task_name"])
 
             # Send to execution function to complete the task based on the context
             result = execution_agent(OBJECTIVE, str(task["task_name"]))
@@ -591,12 +587,11 @@ def main():
             print('Adding new tasks to task_storage')
             for new_task in new_tasks:
                 new_task.update({"task_id": tasks_storage.next_task_id()})
-                print(str(new_task))
+                print(new_task)
                 tasks_storage.append(new_task)
 
             if not JOIN_EXISTING_OBJECTIVE:
-                prioritized_tasks = prioritization_agent()
-                if prioritized_tasks:
+                if prioritized_tasks := prioritization_agent():
                     tasks_storage.replace(prioritized_tasks)
 
             # Sleep a bit before checking the task list again
